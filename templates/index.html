@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Climbing Log</title>
+    <style>
+        /* Style for the table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+    
+        /* Style for table headers */
+        th {
+            padding: 10px;
+            text-align: left;
+        }
+    
+        /* Style for table cells */
+        td {
+            padding: 10px;
+            text-align: left;
+            word-wrap: break-word;
+            white-space: normal;
+            max-width: 200px;       /* Optional */
+        }
+    
+        /* Optional: Style for table borders */
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+    
+        /* Specific style for the Date column */
+        .date-column {
+            max-width: 150px; /* Adjust max-width for the date column */
+            word-wrap: break-word; /* Ensure long dates wrap correctly */
+        }
+    </style>    
+
+    <!-- Include jQuery for handling AJAX -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            // When the gym is selected, update the sectors dropdown dynamically
+            $('#gym').change(function() {
+                var gymId = $(this).val();
+                console.log('Selected Gym ID:', gymId);  // For debugging
+                
+                // Send AJAX request to get the sectors for the selected gym
+                $.ajax({
+                    url: '/get_sectors/' + gymId,  // Make the request to Flask
+                    method: 'GET',
+                    success: function(response) {
+                        console.log('Received sectors:', response);  // For debugging
+
+                        // Clear the current sector options
+                        $('#sector').empty();
+                        $('#sector').append('<option value="">Select a sector</option>');  // Add default option
+
+                        // Populate the sectors dropdown with the new options
+                        response.sectors.forEach(function(sector) {
+                            $('#sector').append('<option value="' + sector.id + '">' + sector.name + '</option>');
+                        });
+                    },
+                    error: function(error) {
+                        console.log('Error fetching sectors:', error);  // For debugging
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+
+    <h1>Climbing Log</h1>
+
+    <!-- Form to Add a New Climb -->
+    <form action="/add_climb" method="POST">
+        <label for="gym">Gym:</label>
+        <select name="gym" id="gym" required>
+            <option value="" disabled selected>Select a gym</option>
+            {% for gym in gyms %}
+                <option value="{{ gym.id }}">{{ gym.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="sector">Sector:</label>
+        <select name="sector" id="sector" required>
+            <option value="" disabled selected>Select a sector</option>
+            <!-- Sectors will be populated dynamically based on gym selection -->
+        </select>
+
+        <label for="setter">Setter:</label>
+        <select name="setter" required>
+            {% for setter in setters %}
+                <option value="{{ setter.id }}">{{ setter.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="color">Hold Color:</label>
+        <input type="text" name="color" required>
+
+        <label for="grade">Grade:</label>
+        <input type="number" name="grade" required>
+
+        <label for="date_set">Date Set:</label>
+        <input type="date" name="date_set" required>
+
+        <button type="submit">Add Climb</button>
+    </form>
+
+    <h2>Existing Climbs</h2>
+    <table border="1">
+        <tr>
+            <th>ID</th>
+            <th>Gym</th>
+            <th>Sector</th>
+            <th>Setter</th>
+            <th>Color</th>
+            <th>Grade</th>
+            <th>Date Set</th>
+        </tr>
+        {% for climb in climbs %}
+        <tr>
+            <td>{{ climb.id }}</td>
+            <td>{{ climb.gym_name }}</td>
+            <td>{{ climb.sector_name }}</td>
+            <td>{{ climb.setter_name }}</td>
+            <td>{{ climb.color }}</td>
+            <td>{{ climb.grade }}</td>
+            <td class="date-column">{{ climb.date_set }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</body>
+</html>
