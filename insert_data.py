@@ -1,112 +1,98 @@
 import sqlite3
 
-# Database filename
-DB_FILENAME = "climbing_gym.db"
+def insert_data():
+    conn = sqlite3.connect("climbing_gym.db")
+    cursor = conn.cursor()
 
-# Sample data
+    # Insert gyms
+    gyms = [
+        ("ClimbO", "/static/gym_maps/ClimbO_map.png"),
+        ("Apuano Appeso", "/static/gym_maps/Apuano_map.png"),
+        ("Farm", "/static/gym_maps/Farm_map.png")
+    ]
+    cursor.executemany("INSERT INTO gyms (name, map_location) VALUES (?, ?) ON CONFLICT(name) DO NOTHING;", gyms)
 
-# (name, map_path)
-mapfolder = '/static/gym_maps/'
-gyms = [
-    ('ClimbO',mapfolder+'ClimbO_map.png'),      #id 1
-    ('Apuano Appeso',mapfolder+'AA_map.png')    #id 2
-]
+    # Insert setters
+    setters = ["Jacopo", "Leo", "Rugo", "Pietro", "Baro"]
+    cursor.executemany("INSERT INTO setters (name) VALUES (?) ON CONFLICT(name) DO NOTHING;", [(s,) for s in setters])
 
-# (gym_id, sector_id, name, x, y)
-sectors = [
-#CLIMBO
-    (1, 'Placca shop', 100, 150),        # Sector 1 for gym 1
-    (1, 'Placca sx', 200, 250),          # Sector 2 for gym 1
-    (1, 'Tetto sx', 150, 200),           # Sector 3 for gym 1
-    (1, 'Tetto sotto', 400, 500),        # Sector 4 for gym 1
-    (1, 'Tetto dx', 450, 550),           # Sector 5 for gym 1
-    (1, 'Placca dx', 350, 400),          # Sector 6 for gym 1
-    (1, '5 gradi', 250, 300),            # Sector 7 for gym 1
-    (1, 'Diedro sx', 300, 350),          # Sector 8 for gym 1
-    (1, '15 gradi', 600, 700),           # Sector 9 for gym 1
-    (1, 'Strapiombo', 700, 750),        # Sector 10 for gym 1
-    (1, 'Diedro dx', 450, 400),         # Sector 11 for gym 1
-    (1, 'Spray', 550, 650),             # Sector 12 for gym 1
-    (1, 'Comp', 650, 700),              # Sector 13 for gym 1
-#APUANO APPESO
-    (2, 'Placca sx', 250, 300),          # Sector 1 for gym 2
-    (2, 'Diedro sx', 350, 400),          # Sector 2 for gym 2
-    (2, '10 gradi', 300, 350),           # Sector 3 for gym 2
-    (2, 'Strapiombo', 450, 500),         # Sector 4 for gym 2
-    (2, '15 gradi', 550, 600),           # Sector 5 for gym 2
-    (2, 'Diedro dx', 600, 650),          # Sector 6 for gym 2
-    (2, 'Placca dx', 500, 550)           # Sector 7 for gym 2
-]
+    # Insert sectors with estimated coordinates
+    sectors = {
+        "ClimbO": [
+            ("placca shop", 300, 100, "[(280,90), (320,110)]"),
+            ("tetto", 450, 120, "[(430,110), (470,130)]"),
+            ("diedro", 600, 150, "[(580,140), (620,160)]"),
+            ("strapiombo", 750, 180, "[(730,170), (770,190)]"),
+            ("spray", 850, 200, "[(830,190), (870,210)]")
+        ],
+        "Apuano Appeso": [
+            ("Diedro sx", 177, 105, "[(177,142), (177,60), (205,60)]"),
+            ("10 gradi", 264, 64, "[(206,60),(350, 60)]"),
+            ("Strapiombo", 458, 124, "[(351,63), (425,124), (566,166)]"),
+            ("15 gradi", 596, 88, "[(567,166), (618,71)]"),
+            ("Diedro dx", 652, 80, "[(619,71), (654,50), (657,118)]"),
+            ("Placca", 660, 200, "[(657,119), (659,316)]")
+        ],
+        "Farm": [
+            ("placca", 200, 100, "[(180,90), (220,110)]"),
+            ("grotta", 400, 130, "[(380,120), (420,140)]"),
+            ("fungo", 600, 160, "[(580,150), (620,170)]"),
+            ("comp", 800, 190, "[(780,180), (820,200)]")
+        ]
+    }
 
+    for gym, sector_list in sectors.items():
+        cursor.execute("SELECT id FROM gyms WHERE name = ?;", (gym,))
+        gym_id = cursor.fetchone()[0]
+        cursor.executemany("""
+            INSERT INTO sectors (name, gym_id, center_x, center_y, boundary_points) 
+            VALUES (?, ?, ?, ?, ?) ON CONFLICT(name, gym_id) DO NOTHING;
+        """, [(s[0], gym_id, s[1], s[2], s[3]) for s in sector_list])
 
-setters = [
-    ('Jacopo Omodei',),                 #id 1
-    ('Ruggero Collavini',),             #id 2
-    ('Leonardo Bellinvia',),            #id 3
-    ('Pietro Del Rio',),                #id 4
-    ('Andrea Baroncini',)               #id 5
-]
+    for gym, sector_list in sectors.items():
+        cursor.execute("SELECT id FROM gyms WHERE name = ?;", (gym,))
+        gym_id = cursor.fetchone()[0]
+        cursor.executemany("""
+            INSERT INTO sectors (name, gym_id, center_x, center_y, boundary_points) 
+            VALUES (?, ?, ?, ?, ?) ON CONFLICT(name, gym_id) DO NOTHING;
+        """, [(s[0], gym_id, s[1], s[2], s[3]) for s in sector_list])
 
-# Define grading schemes per gym
-grades = [
-#CLIMBO
-    (1, 'Verde'),                       #Grade 1 for gym 1
-    (1, 'Blu'),                         #Grade 2 for gym 1                
-    (1, 'Giallo'),                      #Grade 3 for gym 1
-    (1, 'Arancione'),                   #Grade 4 for gym 1
-    (1, 'Rosso'),                       #Grade 5 for gym 1
-    (1, 'Viola'),                       #Grade 6 for gym 1
-#APUANO APPESO
-    (2, '1'),                           #Grade 1 for gym 2
-    (2, '2'),                           #Grade 2 for gym 2
-    (2, '3'),                           #Grade 3 for gym 2
-    (2, '4'),                           #Grade 4 for gym 2
-    (2, '5'),                           #Grade 5 for gym 2
-    (2, '6'),                           #Grade 6 for gym 2
-    (2, '7'),                           #Grade 7 for gym 2
-    (2, '8'),                           #Grade 8 for gym 2
-    (2, '9')                            #Grade 9 for gym 2
-]
+    # Insert grading schemes
+    grades = {
+        "ClimbO": ["verde", "blu", "giallo", "arancione", "rosso", "viola"],
+        "Apuano Appeso": ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+        "Farm": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    }
+    for gym, grade_list in grades.items():
+        cursor.execute("SELECT id FROM gyms WHERE name = ?;", (gym,))
+        gym_id = cursor.fetchone()[0]
+        cursor.executemany("INSERT INTO grades (grade, gym_id) VALUES (?, ?) ON CONFLICT(grade, gym_id) DO NOTHING;",
+                           [(g, gym_id) for g in grade_list])
 
-# Sample climbs with grade reference
-# (gym_id, sector_id, setter_id, color, grade_id, date_set)
-climbs = [
-    (1, 1, 1, 'Verde', 3, '2025-02-20'),        # Gym 1, Sector 1, Setter 1, Green, Grade 3, Date set: 2025-02-20
-    (1, 10, 4, 'Arancione', 6, '2025-02-02'),   # Gym 1, Sector 10, Setter 4, Orange, Grade 6, Date set: 2025-02-02
-    (2, 3, 2, 'Blu', 8, '2025-01-12'),          # Gym 2, Sector 3, Setter 2, Blue, Grade 8, Date set: 2025-01-12
-    (2, 6, 3, 'Giallo', 7, '2025-01-12')        # Gym 2, Sector 6, Setter 3, Yellow, Grade 7, Date set: 2025-01-12
-]
+    # Insert climbs
+    climbs = [
+        ("ClimbO", "diedro", "rosso", "Jacopo", "verde", "2025-02-02"),
+        ("Apuano Appeso", "Strapiombo", "4", "Leo", "rosa", "2025-02-17"),
+        ("Farm", "fungo", "8", "Rugo", "nera", "2025-03-01")
+    ]
+    for gym, sector, grade, setter, hold_color, date in climbs:
+        cursor.execute("SELECT id FROM gyms WHERE name = ?;", (gym,))
+        gym_id = cursor.fetchone()[0]
+        cursor.execute("SELECT id FROM sectors WHERE name = ? AND gym_id = ?;", (sector, gym_id))
+        sector_id = cursor.fetchone()[0]
+        cursor.execute("SELECT id FROM grades WHERE grade = ? AND gym_id = ?;", (grade, gym_id))
+        grade_id = cursor.fetchone()[0]
+        cursor.execute("SELECT id FROM setters WHERE name = ?;", (setter,))
+        setter_id = cursor.fetchone()[0]
 
-def insert_sample_data():
-    """Inserts sample data into the database."""
-    try:
-        conn = sqlite3.connect(DB_FILENAME)
-        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO climbs (sector_id, gym_id, grade_id, setter_id, date_set, hold_color) 
+            VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING;
+        """, (sector_id, gym_id, grade_id, setter_id, date, hold_color))
 
-        # Enable foreign keys
-        cursor.execute('PRAGMA foreign_keys = ON')
-
-        # Insert gyms
-        cursor.executemany("INSERT INTO gyms (name, map_path) VALUES (?, ?)", gyms)
-
-        # Insert sectors
-        cursor.executemany("INSERT INTO sectors (gym_id, name, x, y) VALUES (?, ?, ?, ?)", sectors)
-
-        # Insert setters
-        cursor.executemany("INSERT INTO setters (name) VALUES (?)", setters)
-
-        # Insert grades
-        cursor.executemany("INSERT INTO grades (gym_id, grade) VALUES (?, ?)", grades)
-
-        # Insert climbs
-        cursor.executemany("INSERT INTO climbs (gym_id, sector_id, setter_id, color, grade_id, date_set) VALUES (?, ?, ?, ?, ?, ?)", climbs)
-
-        conn.commit()
-        conn.close()
-
-        print("✅ Sample data inserted successfully!")
-    except sqlite3.Error as e:
-        print(f"❌ Error inserting data: {e}")
+    conn.commit()
+    conn.close()
+    print("✅ Data inserted successfully!")
 
 if __name__ == "__main__":
-    insert_sample_data()
+    insert_data()

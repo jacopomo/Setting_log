@@ -1,63 +1,48 @@
 -- Create the gyms table
-CREATE TABLE IF NOT EXISTS gyms (
+CREATE TABLE gyms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
-    map_path TEXT NOT NULL
+    map_location TEXT -- Stores the file path to the gym's layout map
 );
 
--- Create the grading schemes table (simplified structure)
-CREATE TABLE IF NOT EXISTS grades (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Unique grade id
-    gym_id INTEGER NOT NULL,               -- Gym reference
-    grade TEXT NOT NULL,                   -- Grade name (e.g., Verde, Blu, etc.)
-    FOREIGN KEY (gym_id) REFERENCES gyms(id) ON DELETE CASCADE
-);
-
+-- Create the sectors table (each sector belongs to a gym)
 CREATE TABLE sectors (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    gym_id INTEGER NOT NULL,
     name TEXT NOT NULL,
-    x INTEGER NOT NULL,
-    y INTEGER NOT NULL,
-    FOREIGN KEY (gym_id) REFERENCES gyms(id)
+    gym_id INTEGER NOT NULL,
+    center_x INTEGER,
+    center_y INTEGER,
+    boundary_points TEXT,
+    FOREIGN KEY (gym_id) REFERENCES gyms(id) ON DELETE CASCADE,
+    UNIQUE (name, gym_id) -- Ensures sector names are unique within a gym
 );
 
-
-
--- Create the setters table
-CREATE TABLE IF NOT EXISTS setters (
+-- Create the setters table (people who set climbs)
+CREATE TABLE setters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL
 );
-CREATE TABLE climbs (
+
+-- Create the grades table (each gym has its own grading system)
+CREATE TABLE grades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    grade TEXT NOT NULL,
     gym_id INTEGER NOT NULL,
-    sector_id INTEGER NOT NULL,
-    setter_id INTEGER NOT NULL,
-    color TEXT NOT NULL,
-    grade_id INTEGER NOT NULL,
-    date_set TEXT NOT NULL,
-    FOREIGN KEY (gym_id) REFERENCES gyms(id),
-    FOREIGN KEY (sector_id) REFERENCES sectors(id),
-    FOREIGN KEY (setter_id) REFERENCES setters(id),
-    FOREIGN KEY (grade_id) REFERENCES grades(id)
+    FOREIGN KEY (gym_id) REFERENCES gyms(id) ON DELETE CASCADE,
+    UNIQUE (grade, gym_id) -- Ensures grade uniqueness per gym
 );
 
-
--- Create the climb_archive table (Stores removed climbs)
-CREATE TABLE IF NOT EXISTS climb_archive (
+-- Create the climbs table (each climb belongs to a sector and follows a gym's grading system)
+CREATE TABLE climbs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    gym_id INTEGER NOT NULL,
-    climb_id INTEGER NOT NULL,
     sector_id INTEGER NOT NULL,
-    setter_id INTEGER NOT NULL,
-    color TEXT NOT NULL,
+    gym_id INTEGER NOT NULL,
     grade_id INTEGER NOT NULL,
+    setter_id INTEGER NOT NULL,
     date_set DATE NOT NULL,
-    date_removed DATE NOT NULL,
-    FOREIGN KEY (gym_id) REFERENCES gyms(id) ON DELETE CASCADE,
-    FOREIGN KEY (climb_id) REFERENCES climbs(id) ON DELETE CASCADE,
+    hold_color TEXT NOT NULL,
     FOREIGN KEY (sector_id) REFERENCES sectors(id) ON DELETE CASCADE,
-    FOREIGN KEY (setter_id) REFERENCES setters(id) ON DELETE CASCADE,
-    FOREIGN KEY (grade_id) REFERENCES grades(id) ON DELETE CASCADE
+    FOREIGN KEY (gym_id) REFERENCES gyms(id) ON DELETE CASCADE,
+    FOREIGN KEY (grade_id) REFERENCES grades(id) ON DELETE CASCADE,
+    FOREIGN KEY (setter_id) REFERENCES setters(id) ON DELETE SET NULL
 );
