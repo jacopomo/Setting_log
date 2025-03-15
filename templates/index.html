@@ -49,9 +49,31 @@
             transition: stroke 0.2s ease-in-out, stroke-width 0.2s ease-in-out;
         }
 
-        .sector-line:hover {
+        .sector-line:hover,
+        .sector-highlight {
             stroke: yellow !important;
             stroke-width: 8px !important;
+        }
+
+        .sector-marker:hover,
+        .sector-label-highlight {
+            background-color: yellow !important;
+            color: black !important;
+        }
+
+        .sector-marker:hover::after {
+            content: attr(data-info);
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px;
+            border-radius: 5px;
+            white-space: nowrap;
+            font-size: 12px;
+            z-index: 10;
         }
 
         table {
@@ -98,6 +120,46 @@
                 // 📋 Update existing climbs table
                 updateClimbsTable(gymName);
             });
+        });
+
+
+
+        function updateSectorInfo(sectorId) {
+            $.get(`/get_climbs/${sectorId}`, function(response) {
+                let climbText = response.climbs.length > 0
+                    ? response.climbs.map(c => `${c.color} | ${c.grade} | ${c.setter} | ${c.date}`).join("\n")
+                    : "No climbs yet.";
+
+                console.log(`Sector ${sectorId} Climbs:`, climbText);
+
+                // ✅ Ensure both `data-info` and `title` attributes are updated
+                $(`.sector-marker[data-sector='${sectorId}']`)
+                    .attr("data-info", climbText)
+                    .attr("title", climbText);  // ✅ Tooltip fallback
+            });
+        }
+
+            
+
+        function addHoverEffects() {
+            $(document).off("mouseenter mouseleave").on("mouseenter", ".sector-line, .sector-marker", function() {
+                let sectorId = $(this).attr("data-sector");
+
+                // ✅ Highlight all lines and labels for the sector
+                $(`.sector-line[data-sector='${sectorId}']`).addClass("sector-highlight");
+                $(`.sector-marker[data-sector='${sectorId}']`).addClass("sector-label-highlight");
+
+                updateSectorInfo(sectorId);  // ✅ Load sector info
+
+            }).on("mouseleave", ".sector-line, .sector-marker", function() {
+                let sectorId = $(this).attr("data-sector");
+
+                // ✅ Remove highlighting when the mouse leaves
+                $(`.sector-line[data-sector='${sectorId}']`).removeClass("sector-highlight");
+                $(`.sector-marker[data-sector='${sectorId}']`).removeClass("sector-label-highlight");
+            });
+        }
+
             function updateSectors(gymName) {
                 $.get('/get_sectors/' + encodeURIComponent(gymName), function(response) {
                     $('.sector-marker').remove();
@@ -156,9 +218,42 @@
 
                         $("#gym-map-container").append(label);
                     });
+
+                    addHoverEffects();       
                 });
             }
 
+
+            function updateClimbsTable(gymName) {
+                $.get(`/get_climbs_by_gym/${encodeURIComponent(gymName)}`, function(response) {
+                    let tableBody = $("#climb-table tbody");
+                    tableBody.empty(); // ✅ Clear previous content
+
+                    if (response.climbs.length === 0) {
+                        tableBody.append(`<tr><td colspan="8">No climbs found</td></tr>`);
+                        return;
+                    }
+
+                    response.climbs.forEach(climb => {
+                        tableBody.append(`
+                            <tr>
+                                <td>${climb.id}</td>
+                                <td>${climb.gym_name}</td>
+                                <td>${climb.sector_name ? climb.sector_name : "Unknown"}</td>
+                                <td>${climb.setter_name}</td>
+                                <td>${climb.hold_color}</td>
+                                <td>${climb.grade ? climb.grade : "Unknown"}</td>
+                                <td>${climb.date_set}</td>
+                                <td><button onclick="deleteClimb(${climb.id})">❌ Delete</button></td>
+                            </tr>
+                        `);
+                    });
+                }).fail(function() {
+                    console.error("Failed to fetch climbs.");
+                });
+            }
+
+            
             function updateSectorDropdown(gymName) {
                 $.get(`/get_sectors/${encodeURIComponent(gymName)}`, function(response) {
                     $("#sector-select").empty().append('<option value="" disabled selected>Select a sector</option>');
@@ -177,29 +272,11 @@
                 });
             }
 
-            function updateClimbsTable(gymName) {
-                $.get(`/get_climbs_by_gym/${encodeURIComponent(gymName)}`, function(response) {
-                    $("#climb-table tbody").empty();
-                    response.climbs.forEach(climb => {
-                        $("#climb-table tbody").append(`
-                            <tr>
-                                <td>${climb.id}</td>
-                                <td>${climb.gym_name}</td>
-                                <td>${climb.sector_name}</td>
-                                <td>${climb.setter_name}</td>
-                                <td>${climb.hold_color}</td>
-                                <td>${climb.grade}</td>
-                                <td>${climb.date_set}</td>
-                                <td><button onclick="deleteClimb(${climb.id})">❌ Delete</button></td>
-                            </tr>
-                        `);
-                    });
-                });
-            }
-
             // ✅ Add Climb Form Submission
-            $("#add-climb-form").submit(function(event) {
+            $(document).on("submit", "#add-climb-form", function(event) {
                 event.preventDefault();
+                console.log("Form submitted!");  // 🛠️ Debugging log to confirm event fires
+
                 let climbData = {
                     gym: $("#gym").val(),
                     sector: $("#sector-select").val(),
@@ -209,14 +286,21 @@
                     date: $("#date-input").val()
                 };
 
+                console.log("Submitting climb:", climbData);  // ✅ Debugging log
+
                 $.ajax({
                     url: "/add_climb",
                     type: "POST",
                     contentType: "application/json",
                     data: JSON.stringify(climbData),
                     success: function(response) {
+                        console.log("Climb added successfully:", response);  // ✅ Debugging success log
                         alert(response.message);
-                        updateClimbsTable($("#gym").val()); // Refresh only the climbs table
+                        updateClimbsTable($("#gym").val()); // ✅ Refresh only the climbs table
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error adding climb:", xhr.responseText);  // ✅ Debugging error
+                        alert("Failed to add climb. Check console for details.");
                     }
                 });
             });
@@ -229,12 +313,43 @@
                         type: "DELETE",
                         success: function(response) {
                             alert(response.message);
-                            updateClimbsTable($("#gym").val()); // Refresh only the climbs table
+                            updateClimbsTable($("#gym").val()); // ✅ Refresh only the climbs table
                         }
                     });
                 }
             };
-        });
+
+            $("#submit-climb").click(function(event) {
+                event.preventDefault();
+                console.log("Button clicked, submitting climb...");
+
+                let climbData = {
+                    gym: $("#gym").val(),
+                    sector: $("#sector-select").val(),
+                    setter: $("#setter-select").val(),
+                    grade: $("#grade-select").val(),
+                    color: $("#color-input").val(),
+                    date: $("#date-input").val()
+                };
+
+                console.log("Submitting climb:", climbData);
+
+                $.ajax({
+                    url: "/add_climb",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify(climbData),
+                    success: function(response) {
+                        alert(response.message);
+                        updateClimbsTable($("#gym").val());
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error adding climb:", xhr.responseText);
+                        alert("Failed to add climb. Check console for details.");
+                    }
+                });
+            });
+
     </script>
 </head>
 <body>
@@ -275,10 +390,24 @@
         <label for="date-input">Date Set:</label>
         <input type="date" id="date-input" required>
 
-        <button type="submit">Add Climb</button>
+        <button id="submit-climb">Add Climb</button>
+
     </form>
+
     <h2>Existing Climbs</h2>
     <table border="1" id="climb-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Gym</th>
+                <th>Sector</th>
+                <th>Setter</th>
+                <th>Color</th>
+                <th>Grade</th>
+                <th>Date Set</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
         <tbody></tbody>
     </table>
 

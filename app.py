@@ -102,14 +102,16 @@ def get_climbs_by_gym(gym_name):
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Get the gym ID
     cursor.execute("SELECT id FROM gyms WHERE name = ?", (gym_name,))
     gym = cursor.fetchone()
     if not gym:
         return jsonify({'error': 'Gym not found'}), 404
     
     gym_id = gym[0]
-    
-    climbs = cursor.execute("""
+
+    # Fetch climbs for this gym
+    cursor.execute("""
         SELECT climbs.id, climbs.hold_color, grades.grade, climbs.date_set, 
                sectors.name AS sector_name, gyms.name AS gym_name, 
                setters.name AS setter_name
@@ -120,14 +122,14 @@ def get_climbs_by_gym(gym_name):
         JOIN grades ON climbs.grade_id = grades.id
         WHERE climbs.gym_id = ?
         ORDER BY climbs.date_set DESC;
-    """, (gym_id,)).fetchall()
+    """, (gym_id,))
+    climbs = cursor.fetchall()
 
     conn.close()
 
     return jsonify({'climbs': [
-        {'id': c['id'], 'hold_color': c['hold_color'], 'grade': c['grade'], 
-         'date_set': c['date_set'], 'sector_name': c['sector_name'], 
-         'gym_name': c['gym_name'], 'setter_name': c['setter_name']}
+        {'id': c[0], 'hold_color': c[1], 'grade': c[2], 'date_set': c[3],
+         'sector_name': c[4], 'gym_name': c[5], 'setter_name': c[6]}
         for c in climbs
     ]})
 
@@ -137,31 +139,53 @@ def get_climbs_by_gym(gym_name):
 @app.route('/add_climb', methods=['POST'])
 def add_climb():
     data = request.json
+
+    if not data or not all(k in data for k in ["gym", "sector", "grade", "setter", "color", "date"]):
+        return jsonify({"error": "Missing required fields"}), 400  # ✅ Proper error handling
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    try:
     # Get necessary IDs from database
-    cursor.execute("SELECT id FROM gyms WHERE name = ?", (data['gym'],))
-    gym_id = cursor.fetchone()[0]
+        cursor.execute("SELECT id FROM gyms WHERE name = ?", (data['gym'],))
+        gym = cursor.fetchone()
+        if not gym:
+            return jsonify({"error": "Gym not found"}), 404
+        gym_id = gym[0]
+    
+        cursor.execute("SELECT id FROM sectors WHERE name = ? AND gym_id = ?", (data['sector'], gym_id))
+        sector = cursor.fetchone()
+        if not sector:
+            return jsonify({"error": "Sector not found"}), 404
+        sector_id = sector[0]
 
-    cursor.execute("SELECT id FROM sectors WHERE name = ? AND gym_id = ?", (data['sector'], gym_id))
-    sector_id = cursor.fetchone()[0]
+        cursor.execute("SELECT id FROM grades WHERE grade = ? AND gym_id = ?", (data['grade'], gym_id))
+        grade = cursor.fetchone()
+        if not grade:
+            return jsonify({"error": "Grade not found"}), 404
+        grade_id = grade[0]
 
-    cursor.execute("SELECT id FROM grades WHERE grade = ? AND gym_id = ?", (data['grade'], gym_id))
-    grade_id = cursor.fetchone()[0]
+        cursor.execute("SELECT id FROM setters WHERE name = ?", (data['setter'],))
+        setter = cursor.fetchone()
+        if not setter:
+            return jsonify({"error": "Setter not found"}), 404
+        setter_id = setter[0]
 
-    cursor.execute("SELECT id FROM setters WHERE name = ?", (data['setter'],))
-    setter_id = cursor.fetchone()[0]
+        # Insert new climb
+        cursor.execute("""
+            INSERT INTO climbs (sector_id, gym_id, grade_id, setter_id, date_set, hold_color) 
+            VALUES (?, ?, ?, ?, ?, ?);
+        """, (sector_id, gym_id, grade_id, setter_id, data['date'], data['color']))
 
-    # Insert new climb
-    cursor.execute("""
-        INSERT INTO climbs (sector_id, gym_id, grade_id, setter_id, date_set, hold_color) 
-        VALUES (?, ?, ?, ?, ?, ?);
-    """, (sector_id, gym_id, grade_id, setter_id, data['date'], data['color']))
+        conn.commit()
+        return jsonify({"message": "Climb added successfully!"}), 201
+        
+    except Exception as e:
+            return jsonify({"error": str(e)}), 500  # ✅ Catch and return errors
 
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Climb added successfully!"}), 201
+    finally:
+        conn.close()
 
 # ✅ Route to delete a climb
 @app.route('/delete_climb/<int:climb_id>', methods=['DELETE'])
